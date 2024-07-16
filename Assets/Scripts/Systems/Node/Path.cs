@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System;
+using System.Collections;
 using UnityEngine;
 
 using Random = UnityEngine.Random;
@@ -12,8 +13,8 @@ namespace Systems.Node
 
         protected virtual void CreatePath() {}
 
-        protected abstract void CreateNodes(T originObject);
-        protected abstract void CreateNodes(Node<T, U> originNode);
+        protected virtual void CreateNodes(T originObject){}
+        protected virtual void CreateNodes(Node<T, U> originNode){}
 
         protected virtual void RandomBranchingNodes(Node<T,U> originNode, int minConnectionsPerRow, int maxConnectionsPerRow, 
             int minConnections, int maxConnections, int maxIterations = 6, bool addToCollection = true, bool allowRepeatedNodes = false)
@@ -71,11 +72,11 @@ namespace Systems.Node
         /// <param name="action">Action to execute on origin node or object resultant from function.</param>
         /// <param name="function"> Function that returns a specified object.</param>
         ///  /// <param name="executeActionInOrigin"> Whether the action should be executed in the origin node or not. </param>
-        protected void ExplorePaths( Action<object> action, Func<T,object> function = null, bool executeActionInOrigin = true)
+        protected void ExplorePaths( Action<object> action, bool executeActionInOrigin = true, Func<T,object> function = null)
         {
             foreach (var path in paths)
             {
-                ExploreNode(path, action, function, executeActionInOrigin);
+                ExploreNode(path, action, executeActionInOrigin, function);
             }
         }
         /// <summary>
@@ -85,7 +86,7 @@ namespace Systems.Node
         /// <param name="action"> Action to execute on origin node or object resultant from function.</param>
         /// <param name="function"> Function that returns a specified object.</param>
         /// <param name="executeActionInOrigin"> Whether the action should be executed in the origin node or not. </param>
-        protected void ExploreNode(Node<T,U> node, Action<object> action, Func<T,object> function = null, bool executeActionInOrigin = true)
+        protected void ExploreNode(Node<T,U> node, Action<object> action, bool executeActionInOrigin = true, Func<T,object> function = null)
         {
             if(node == null) return;
             
@@ -105,7 +106,51 @@ namespace Systems.Node
             {
                 if (connection == null) continue;
                 
-                ExploreNode(connection,action,function);
+                ExploreNode(connection,action, executeActionInOrigin,function);
+            }
+        }
+        
+        /// <summary>
+        /// Explores all nodes connected to the origin node. Executes actions on nodes and waits until the action
+        /// is finished before jumping to the next node.
+        /// </summary>
+        /// <param name="node"> Origin node to explore connections from.</param>
+        /// <param name="action"> Action to execute on origin node or object resultant from function.</param>
+        /// <param name="function"> Function that returns a specified object.</param>
+        /// <param name="executeActionInOrigin"> Whether the action should be executed in the origin node or not. </param>
+        protected IEnumerator ExploreNode(Node<T,U> node, Func<object, IEnumerator> action, bool executeActionInOrigin = true, Func<T,IEnumerator<object>> function = null)
+        {
+            if(node == null) yield break;
+            
+            if (executeActionInOrigin || !node.IsOriginNode)
+            {
+                object result = node;
+                if (function != null)
+                {
+                    IEnumerator<object> functionCoroutine = function(node.GetObject());
+                    while (functionCoroutine.MoveNext())
+                    {
+                        result = functionCoroutine.Current;
+                        yield return null;
+                    }
+                }
+                IEnumerator actionCoroutine = action(result);
+                while (actionCoroutine.MoveNext())
+                {
+                    yield return actionCoroutine.Current;
+                }
+            }
+      
+
+            if (node.nodes == null) yield break;
+            foreach (var connection in node.nodes)
+            {
+                if (connection == null) continue;
+                IEnumerator connectionCoroutine = ExploreNode(connection, action, executeActionInOrigin, function);
+                while (connectionCoroutine.MoveNext())
+                {
+                    yield return connectionCoroutine.Current;
+                }
             }
         }
         

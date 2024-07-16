@@ -7,10 +7,10 @@ namespace Cainos.PixelArtTopDown_Basic
     public class TopDownCharacterController : MonoBehaviour
     {
         public float speed;
-
-        private Animator animator;
-
-        private void Start()
+        public Vector2 dir;
+        public Animator animator;
+        
+        private void Awake()
         {
             animator = GetComponent<Animator>();
         }
@@ -18,7 +18,6 @@ namespace Cainos.PixelArtTopDown_Basic
 
         private void Update()
         {
-            Vector2 dir = Vector2.zero;
             if (Input.GetKey(KeyCode.A))
             {
                 dir.x = -1;
